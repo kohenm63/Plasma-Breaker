@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Plasma Breaker - Energy Ring Platformer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+    body {
+      font-family: 'Orbitron', sans-serif;
+      background-color: #0a0a1a;
+      color: #e0e0ff;
+      overflow-x: hidden;
+    }
+    .game-container { perspective: 1000px; position: relative; }
+    .energy-ring {
+      animation: spin 3s linear infinite;
+      box-shadow: 0 0 15px 5px rgba(255,100,0,0.7);
+      position: absolute;
+    }
+    .energy-ring-inner {
+      animation: pulse 1.5s ease-in-out infinite alternate;
+      width: 75%;
+      height: 75%;
+      border-radius: 50%;
+      border: 2px solid #FDE68A;
+      margin: auto;
+      position: relative;
+      top: 12.5%;
+    }
+    .player-character {
+      animation: float 2s ease-in-out infinite;
+      filter: drop-shadow(0 0 8px rgba(0,200,255,0.8));
+      position: absolute;
+    }
+    .momentum-boost { animation: boost 0.5s ease-out; }
+    .broken-ring { animation: shatter 0.8s forwards; }
+    @keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+    @keyframes pulse {
+      from{opacity:0.7;transform:scale(0.95);} 
+      to{opacity:1;transform:scale(1.05);}
+    }
+    @keyframes float {
+      0%,100%{transform:translateY(0);} 
+      50%{transform:translateY(-10px);}
+    }
+    @keyframes boost {
+      0%{transform:scale(1);filter:brightness(1);} 
+      50%{transform:scale(1.1);filter:brightness(1.5);} 
+      100%{transform:scale(1);filter:brightness(1);}
+    }
+    @keyframes shatter {
+      0%{transform:scale(1);opacity:1;} 
+      50%{transform:scale(1.2);opacity:0.8;} 
+      100%{transform:scale(0);opacity:0;}
+    }
+    .hazard { animation: flicker 1.5s ease-in-out infinite; }
+    @keyframes flicker {
+      0%,19%,21%,23%,25%,54%,56%,100%{opacity:1;}
+      20%,22%,24%,55%{opacity:0.3;}
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col">
+  <!-- Header -->
+  <header class="bg-black bg-opacity-70 border-b border-blue-900 py-4 px-6 flex justify-between items-center sticky top-0 z-50">
+    <div class="flex items-center space-x-4">
+      <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+        <i class="fas fa-atom text-white text-xl"></i>
+      </div>
+      <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+        PLASMA BREAKER
+      </h1>
+    </div>
+    <div class="flex items-center space-x-6">
+      <div class="has-tooltip relative">
+        <button class="flex items-center space-x-2 bg-blue-900 bg-opacity-50 hover:bg-opacity-70 px-4 py-2 rounded-lg transition">
+          <i class="fas fa-cog text-blue-300"></i><span>Settings</span>
+        </button>
+        <div class="tooltip absolute top-full mt-2 right-0 bg-gray-800 text-white px-3 py-2 rounded-lg text-sm w-48">
+          Adjust game settings, controls, and graphics
+        </div>
+      </div>
+      <div class="has-tooltip relative">
+        <button class="flex items-center space-x-2 bg-purple-900 bg-opacity-50 hover:bg-opacity-70 px-4 py-2 rounded-lg transition">
+          <i class="fas fa-trophy text-yellow-300"></i><span>Leaderboard</span>
+        </button>
+        <div class="tooltip absolute top-full mt-2 right-0 bg-gray-800 text-white px-3 py-2 rounded-lg text-sm w-48">
+          View top scores and your personal bests
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+          <i class="fas fa-user text-white"></i>
+        </div>
+        <span>Researcher_42</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Game Area -->
+  <main class="flex-grow flex flex-col items-center justify-center p-6">
+    <div class="relative w-full max-w-4xl h-96 bg-gray-900 rounded-xl border border-blue-900 overflow-hidden game-container">
+      <!-- Static lab backdrop -->
+      <div class="absolute inset-0 bg-gradient-to-b from-gray-900 to-gray-800 opacity-70"></div>
+      <div class="absolute bottom-0 left-0 w-full h-16 bg-gray-800"></div>
+      <!-- Hazards -->
+      <div class="absolute bottom-16 left-1/4 w-8 h-8 bg-red-500 rounded-full hazard"></div>
+      <div class="absolute bottom-16 right-1/4 w-12 h-4 bg-yellow-500 rounded hazard"></div>
+      <!-- Energy Rings -->
+      <div class="energy-ring w-16 h-16 rounded-full border-4 border-orange-500" style="top:50%; left:25%;">
+        <div class="energy-ring-inner"></div>
+      </div>
+      <div class="energy-ring w-20 h-20 rounded-full border-4 border-orange-500" style="top:33%; left:67%;">
+        <div class="energy-ring-inner"></div>
+      </div>
+      <!-- Player -->
+      <div class="player-character w-8 h-12 bg-gradient-to-b from-cyan-400 to-blue-600 rounded-t-full" style="bottom:16px; left:50%;">
+        <div class="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-white rounded-full"></div>
+      </div>
+
+      <!-- UI Overlay -->
+      <div class="absolute top-4 left-4 bg-black bg-opacity-50 px-3 py-1 rounded-lg text-sm">
+        Sector 7-B
+      </div>
+      <div class="absolute top-4 right-4 flex items-center space-x-4">
+        <div class="bg-black bg-opacity-50 px-3 py-1 rounded-lg text-sm flex items-center space-x-2">
+          <i class="fas fa-bolt text-yellow-400"></i><span>3x</span>
+        </div>
+        <div class="bg-black bg-opacity-50 px-3 py-1 rounded-lg text-sm flex items-center space-x-2">
+          <i class="fas fa-clock text-blue-400"></i><span>1:24</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls Panel -->
+    <div class="w-full max-w-md bg-gray-800 bg-opacity-70 rounded-xl p-6 mb-8">
+      <h2 class="text-xl font-bold mb-4 text-center text-blue-300">CONTROLS</h2>
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="col-span-3 flex justify-center">
+          <button class="w-16 h-16 bg-gray-700 hover:bg-gray-600 rounded-full flex items-center justify-center text-2xl">
+            <i class="fas fa-arrow-up"></i>
+          </button>
+        </div>
+        <div class="flex justify-end">
+          <button class="w-16 h-16 bg-gray-700 hover:bg-gray-600 rounded-full flex items-center justify-center text-2xl">
+            <i class="fas fa-arrow-left"></i>
+          </button>
+        </div>
+        <div class="flex justify-center">
+          <button class="w-16 h-16 bg-gray-700 hover:bg-gray-600 rounded-full flex items-center justify-center text-2xl">
+            <i class="fas fa-arrow-down"></i>
+          </button>
+        </div>
+        <div class="flex justify-start">
+          <button class="w-16 h-16 bg-gray-700 hover:bg-gray-600 rounded-full flex items-center justify-center text-2xl">
+            <i class="fas fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+      <div class="flex justify-between">
+        <button class="px-6 py-3 bg-blue-900 hover:bg-blue-800 rounded-lg flex items-center space-x-2">
+          <i class="fas fa-pause"></i><span>Pause</span>
+        </button>
+        <button class="px-6 py-3 bg-purple-900 hover:bg-purple-800 rounded-lg flex items-center space-x-2">
+          <i class="fas fa-redo"></i><span>Restart</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Level Selector -->
+    <div class="w-full max-w-4xl mb-8">
+      <h2 class="text-xl font-bold mb-4 text-center text-blue-300">SELECT TEST CHAMBER</h2>
+      <div class="grid grid-cols-5 gap-4">
+        <div class="level-selector bg-gray-800 hover:bg-gray-700 rounded-lg p-4 flex flex-col items-center cursor-pointer border border-blue-900">
+          <div class="w-12 h-12 rounded-full bg-blue-900 flex items-center justify-center mb-2">
+            <span class="font-bold">1</span>
+          </div>
+          <span class="text-sm">Initiation</span>
+        </div>
+        <div class="level-selector bg-gray-800 hover:bg-gray-700 rounded-lg p-4 flex flex-col items-center cursor-pointer border border-blue-900">
+          <div class="w-12 h-12 rounded-full bg-blue-900 flex items-center justify-center mb-2">
+            <span class="font-bold">2</span>
+          </div>
+          <span class="text-sm">Containment</span>
+        </div>
+        <div class="level-selector bg-gray-800 hover:bg-gray-700 rounded-lg p-4 flex flex-col items-center cursor-pointer border border-purple-900">
+          <div class="w-12 h-12 rounded-full bg-purple-900 flex items-center justify-center mb-2">
+            <span class="font-bold">3</span>
+          </div>
+          <span class="text-sm">Reactor</span>
+        </div>
+        <div class="level-selector opacity-50 bg-gray-800 rounded-lg p-4 flex flex-col items-center cursor-not-allowed border border-purple-900">
+          <div class="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center mb-2">
+            <i class="fas fa-lock"></i>
+          </div>
+          <span class="text-sm">Locked</span>
+        </div>
+        <div class="level-selector opacity-50 bg-gray-800 rounded-lg p-4 flex flex-col items-center cursor-not-allowed border border-purple-900">
+          <div class="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center mb-2">
+            <i class="fas fa-lock"></i>
+          </div>
+          <span class="text-sm">Locked</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-black bg-opacity-70 border-t border-blue-900 py-4 px-6 flex justify-between items-center">
+    <div class="text-sm text-gray-400">© 2025 Quantum Dynamics Research</div>
+    <div class="flex items-center space-x-4">
+      <button class="text-gray-400 hover:text-white"><i class="fab fa-twitter"></i></button>
+      <button class="text-gray-400 hover:text-white"><i class="fab fa-discord"></i></button>
+      <button class="text-gray-400 hover:text-white"><i class="fab fa-youtube"></i></button>
+    </div>
+    <div class="text-sm text-gray-400">v1.0.3 | Build #4729</div>
+  </footer>
+
+  <!-- Game Engine Script -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // ───── Settings ─────
+      const GRAVITY       = 1500; // px/s²
+      const JUMP_VELOCITY = -550; // px/s
+      const MOVE_SPEED    = 300;  // px/s
+      const FRAME_RATE    = 60;   // max dt
+
+      // ───── Elements ─────
+      const container  = document.querySelector('.game-container');
+      const playerEl   = document.querySelector('.player-character');
+      let rings        = Array.from(document.querySelectorAll('.energy-ring'));
+      const upBtn      = document.querySelector('.fa-arrow-up').parentElement;
+      const leftBtn    = document.querySelector('.fa-arrow-left').parentElement;
+      const rightBtn   = document.querySelector('.fa-arrow-right').parentElement;
+
+      // ───── State ─────
+      let keys     = { left: false, right: false, up: false };
+      let lastTime = performance.now();
+
+      // Compute bounds
+      const contRect = container.getBoundingClientRect();
+      const floorY   = contRect.height - 16; // floor height match
+
+      // Player physics
+      let player = {
+        w: 8, h: 12,
+        x: contRect.width/2 - 4,
+        y: floorY - 12,
+        vy: 0,
+        onGround: true
+      };
+
+      // ───── Input ─────
+      window.addEventListener('keydown', e => {
+        if(e.code==='ArrowLeft'||e.code==='KeyA')   keys.left  = true;
+        else if(e.code==='ArrowRight'||e.code==='KeyD') keys.right = true;
+        else if(e.code==='ArrowUp'||e.code==='KeyW'||e.code==='Space') keys.up = true;
+      });
+      window.addEventListener('keyup', e => {
+        if(e.code==='ArrowLeft'||e.code==='KeyA')   keys.left  = false;
+        else if(e.code==='ArrowRight'||e.code==='KeyD') keys.right = false;
+        else if(e.code==='ArrowUp'||e.code==='KeyW'||e.code==='Space') keys.up = false;
+      });
+      // On-screen
+      upBtn.addEventListener('mousedown',()=>keys.up=true);
+      upBtn.addEventListener('mouseup',  ()=>keys.up=false);
+      leftBtn.addEventListener('mousedown',()=>keys.left=true);
+      leftBtn.addEventListener('mouseup',  ()=>keys.left=false);
+      rightBtn.addEventListener('mousedown',()=>keys.right=true);
+      rightBtn.addEventListener('mouseup', ()=>keys.right=false);
+
+      // ───── Game Loop ─────
+      function loop(now=performance.now()){
+        const dt = Math.min((now-lastTime)/1000,1/FRAME_RATE);
+        lastTime = now;
+
+        // Move horizontally
+        if(keys.left)  player.x -= MOVE_SPEED*dt;
+        if(keys.right) player.x += MOVE_SPEED*dt;
+        player.x = Math.max(0,Math.min(player.x,contRect.width-player.w));
+
+        // Jump
+        if(keys.up && player.onGround){
+          player.vy = JUMP_VELOCITY;
+          player.onGround = false;
+          playerEl.classList.add('momentum-boost');
+          setTimeout(()=>playerEl.classList.remove('momentum-boost'), 500);
+        }
+
+        // Gravity
+        player.vy += GRAVITY*dt;
+        player.y  += player.vy*dt;
+
+        // Floor collision
+        if(player.y >= floorY-player.h){
+          player.y = floorY-player.h;
+          player.vy = 0;
+          player.onGround = true;
+        }
+
+        // Update player DOM
+        playerEl.style.transform = `translate(${player.x}px, ${player.y}px)`;
+
+        // Ring collisions
+        rings.forEach(ringEl => {
+          if(ringEl.dataset.broken) return;
+          const r = ringEl.getBoundingClientRect();
+          const cx = r.left + r.width/2 - contRect.left;
+          const cy = r.top  + r.height/2 - contRect.top;
+          const dx = player.x+player.w/2 - cx;
+          const dy = player.y+player.h/2 - cy;
+          if(player.vy>0 && Math.hypot(dx,dy) < r.width/2){
+            ringEl.classList.add('broken-ring');
+            ringEl.dataset.broken = 'true';
+            player.vy = JUMP_VELOCITY * 0.7; // boost
+          }
+        });
+
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+    });
+  </script>
+</body>
+</html>
